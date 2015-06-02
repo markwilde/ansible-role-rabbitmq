@@ -1,0 +1,67 @@
+---
+
+#- name: Add node to the cluster
+#  shell: rabbitmqctl join cluster rabbit@{{ groups['rabbitmq'][0] }}
+
+#- debug:
+#    msg: "More than one host, we can create a cluster!"
+#    when: "{{ play_hosts|length }} != 1"
+#  run_once: true
+
+- name: "Add nodes to hosts file"
+  lineinfile: "dest=/etc/hosts regexp='^{{ hostvars[item]['ansible_'+iface|default('eth0')].ipv4.address }} {{ hostvars[item].ansible_hostname }}$' line='{{ hostvars[item]['ansible_'+iface|default('eth0')].ipv4.address }} {{ hostvars[item].ansible_hostname }}' state=present"
+  when: "hostvars[item].ansible_default_ipv4.address is defined"
+  with_items: groups['all']
+
+- name: "Capture erlang.cookie from master"
+  command: "cat /var/lib/rabbitmq/.erlang.cookie"
+  register: erlang_cookie
+  delegate_to: "{{ play_hosts[0] }}"
+  run_once: true
+  when: rabbitmq.config.erlang_cookie is not defined
+  changed_when: false
+
+- name: "Check erlang.cookie for each node"
+  shell: "grep {{ rabbitmq.config.erlang_cookie | default(erlang_cookie.stdout) }} /var/lib/rabbitmq/.erlang.cookie"
+  register: erlang_cookie_hosts
+  ignore_errors: yes
+  changed_when: false
+
+- name: Stop RabbitMQ
+  command: service rabbitmq-server stop
+  when: erlang_cookie_hosts.rc == 1
+
+- name: "Update erlang.cooke on each node"
+  template:
+    src: "erlang.cookie.j2"
+    dest: "/var/lib/rabbitmq/.erlang.cookie"
+    owner: rabbitmq
+    group: rabbitmq
+    mode: 0400
+  when: erlang_cookie_hosts.rc == 1
+
+- name: Start RabbitMQ
+  command: service rabbitmq-server start
+  when: erlang_cookie_hosts.rc == 1
+
+- name: "Check cluster status for each node"
+  shell: "rabbitmqctl cluster_status | grep '{cluster_name,<<\"rabbit@{{ hostvars[play_hosts[0]].ansible_hostname }}\">>}'"
+  register: cluster_hosts
+  ignore_errors: yes
+  changed_when: false
+
+- name: Stop RabbitMQ app
+  command: rabbitmqctl stop_app
+  when: "'{{ inventory_hostname }}' != '{{ play_hosts[0] }}' and cluster_hosts.rc == 1"
+
+#- name: "Set primary host"
+#  ping:
+#  when: "'{{ inventory_hostname }}' == '{{ play_hosts[0] }}'"
+
+- name: "Join node to the cluster"
+  command: "rabbitmqctl join_cluster rabbit@{{ hostvars[play_hosts[0]].ansible_hostname }}"
+  when: "'{{ inventory_hostname }}' != '{{ play_hosts[0] }}' and cluster_hosts.rc == 1"
+
+- name: Start RabbitMQ app
+  command: rabbitmqctl start_app
+  when: "'{{ inventory_hostname }}' != '{{ play_hosts[0] }}' and cluster_hosts.rc == 1"

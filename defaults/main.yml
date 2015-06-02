@@ -1,0 +1,33 @@
+---
+
+rabbitmq:
+
+  config:
+
+    cluster: true
+    ulimit: 1024
+    policies:
+      - name: ha-all
+        pattern: '^(?!amq\.).*'
+        definitions:
+          'ha-mode': 'all'
+
+  plugins:
+
+    - rabbitmq_management
+
+  users:
+
+    - user: admin
+      password: password
+      vhost: /
+      configure_priv: .*
+      read_priv: .*
+      write_priv: .*
+      tags: administrator
+      state: present
+
+    - user: guest
+      state: absent
+
+  vhosts: []

@@ -1,0 +1,33 @@
+---
+
+- name: Add official repository
+  apt_repository: "repo='deb http://www.rabbitmq.com/debian/ testing main' state=present"
+
+- name: Add signing key
+  apt_key: "url=https://www.rabbitmq.com/rabbitmq-signing-key-public.asc state=present"
+
+- name: Install RabbitMQ
+  apt: "name=rabbitmq-server state=installed force=yes"
+
+- name: Install plugins
+  rabbitmq_plugin: "names={{item}} state=enabled"
+  with_items: rabbitmq.plugins
+  notify:
+    - restart rabbitmq
+
+- name: Start RabbitMQ
+  service: "name=rabbitmq-server state=started enabled=yes"
+
+- name: Start RabbitMQ App
+  command: "rabbitmqctl start_app"
+  changed_when: false
+
+- include: cluster.yml
+  when: rabbitmq.config.cluster is defined and rabbitmq.config.cluster == true and play_hosts | length > 1
+
+- include: policies.yml
+  when: rabbitmq.config.policies is defined
+
+- name: Update users
+  rabbitmq_user: "user={{ item.user }} password={{ item.password | default('') }} tags={{ item.tags | default('') }} vhost={{ item.vhost | default('/') }} configure_priv={{ item.configure_priv | default('.*') }} write_priv={{ item.write_priv | default('.*') }} read_priv={{ item.read_priv | default('.*') }} state={{item.state}}"
+  with_items: rabbitmq.users

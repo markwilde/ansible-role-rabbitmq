@@ -1,0 +1,6 @@
+---
+
+- name: Set Policies
+  #shell: "rabbitmq set_policy {{ item.name }} \"{{ item.pattern }}\" '{{ item.definitions | to_json }}'"
+  rabbitmq_policy: 'name="{{ item.name }}" pattern="{{ item.pattern }}" tags="{{ item.definitions }}" priority={{ item.priority | default(0) }} state=present'
+  with_items: rabbitmq.config.policies
