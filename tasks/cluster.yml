@@ -1,13 +1,5 @@
 ---
 
-#- name: Add node to the cluster
-#  shell: rabbitmqctl join cluster rabbit@{{ groups['rabbitmq'][0] }}
-
-#- debug:
-#    msg: "More than one host, we can create a cluster!"
-#    when: "{{ play_hosts|length }} != 1"
-#  run_once: true
-
 - name: "Add nodes to hosts file"
   lineinfile: "dest=/etc/hosts regexp='^{{ hostvars[item]['ansible_'+iface|default('eth0')].ipv4.address }} {{ hostvars[item].ansible_hostname }}$' line='{{ hostvars[item]['ansible_'+iface|default('eth0')].ipv4.address }} {{ hostvars[item].ansible_hostname }}' state=present"
   when: "hostvars[item].ansible_default_ipv4.address is defined"
@@ -53,10 +45,6 @@
 - name: Stop RabbitMQ app
   command: rabbitmqctl stop_app
   when: "'{{ inventory_hostname }}' != '{{ play_hosts[0] }}' and cluster_hosts.rc == 1"
-
-#- name: "Set primary host"
-#  ping:
-#  when: "'{{ inventory_hostname }}' == '{{ play_hosts[0] }}'"
 
 - name: "Join node to the cluster"
   command: "rabbitmqctl join_cluster rabbit@{{ hostvars[play_hosts[0]].ansible_hostname }}"
