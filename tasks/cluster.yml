@@ -3,7 +3,7 @@
 - name: "Add nodes to hosts file"
   lineinfile: "dest=/etc/hosts regexp='^{{ hostvars[item]['ansible_'+iface|default('eth0')].ipv4.address }} {{ hostvars[item].ansible_hostname }}$' line='{{ hostvars[item]['ansible_'+iface|default('eth0')].ipv4.address }} {{ hostvars[item].ansible_hostname }}' state=present"
   when: "hostvars[item].ansible_default_ipv4.address is defined"
-  with_items: groups['all']
+  with_items: play_hosts
 
 - name: "Capture erlang.cookie from master"
   command: "cat /var/lib/rabbitmq/.erlang.cookie"
